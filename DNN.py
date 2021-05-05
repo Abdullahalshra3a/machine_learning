@@ -95,15 +95,12 @@ from numpy import loadtxt
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 model = Sequential()
-model.add(Dense(12, input_shape=(10,77), activation='relu'))
+model.add(Dense(12, input_shape=(77,), activation='relu'))
 model.add(Dense(8, activation='relu'))
 model.add(Dense(1, activation='sigmoid'))
 # compile the keras model
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 # fit the keras model on the dataset
-model.fit(X_train, y_train, epochs=150, batch_size=10)
-# evaluate the keras model
-y_pred = model.predict(X_test)
-print(confusion_matrix(y_test,y_pred))
-print(classification_report(y_test,y_pred))
-print ("Accuracy : ", accuracy_score(y_test, y_pred))
+model.fit(X_train, y_train, epochs=10, batch_size=100)
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print('Test Accuracy: %.3f' % acc)
