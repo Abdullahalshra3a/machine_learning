@@ -15,7 +15,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 import warnings
 warnings.filterwarnings('ignore') 
 #DataPath of your CICDDOS CSV files.
-
+import random
 DataPath = '/home/abdullah/Downloads/CSV-01-12/01-12'
 DataPath2 = '/home/abdullah/Downloads/CSV-03-11/03-11'
 #Get List of files in this directory by names.
@@ -26,7 +26,8 @@ cicids_data = []
 for FileName in FilesList:
   if FileName.endswith(".csv"):
     print(FileName)
-    df = pd.read_csv(DataPath +'/'+FileName,  nrows=10000, low_memory=False)#
+    p = 0.01  # 1% of the lines
+    df = pd.read_csv(DataPath +'/'+FileName, header=0, skiprows=lambda i: i>0 and random.random() > p, nrows=100000, low_memory=False)#
     df.drop(labels=['Unnamed: 0', 'Flow ID', ' Source IP', ' Source Port', ' Destination IP', ' Destination Port','SimillarHTTP', ' Timestamp'], axis=1, errors='ignore', inplace=True)
    #Replacing the infinity values with NaN.
     df = df.replace([np.inf, -np.inf], np.nan)
@@ -36,13 +37,15 @@ for FileName in FilesList:
 for FileName in FilesList1:
   if FileName.endswith(".csv"):
     print(FileName)
-    df = pd.read_csv(DataPath2 +'/'+FileName,  nrows=500, low_memory=False)#
+    p = 0.01  # 1% of the lines
+    df = pd.read_csv(DataPath2 +'/'+FileName, header=0, skiprows=lambda i: i>0 and random.random() > p, nrows=100000, low_memory=False)#
     df.drop(labels=['Unnamed: 0', 'Flow ID', ' Source IP', ' Source Port', ' Destination IP', ' Destination Port','SimillarHTTP', ' Timestamp'], axis=1, errors='ignore', inplace=True)
    #Replacing the infinity values with NaN.
     df = df.replace([np.inf, -np.inf], np.nan)
     #Dropping NaN values.
     df.dropna(inplace=True)#axis : {0 or ‘index’, 1 or ‘columns’}, default 0
-    cicids_data.append(df)    
+    cicids_data.append(df)  
+ 
 #print(cicids_data)    
 cicids_data = pd.concat(cicids_data)
 cicids_data = cicids_data.rename(columns={' Label': 'label'})
@@ -68,10 +71,18 @@ df.dropna(inplace=True)#axis : {0 or ‘index’, 1 or ‘columns’}, default 0
 df.loc[df['label'] != 'BENIGN', 'label'] = 0
 df.loc[df['label'] == 'BENIGN', 'label'] = 1
 
+
 print ("number of colummns %d" %(len(df.columns.values)))
 print ("number of rows %d" %(len(df.index.values)))
 #print availbe classes after filtering
-print(df['label'].count())
+print(df['label'].count()) 
+
+#extracting the features and labels from the dataframe
+
+X, y  = df.drop('label', axis=1), df.pop('label').values
+X = X.astype('float32')
+y = np.array(y).astype(int)
+
 
 
 #using shuffle for training data, it is recommended to avoid having the normal traffic or attack traffic in a sequence
@@ -85,38 +96,22 @@ df = shuffle(df)
 df = df.reset_index()
 del df['index']
 
-#extracting the features and labels from the dataframe
-
-X, y_test  = df.drop('label', axis=1), df.pop('label').values
-#y = df['label']
-#y_test = pd.get_dummies(y)
-#unique, counts = np.unique(y_test, return_counts=True)
-#print("unique, counts =", unique, counts)
-X = np.array(X).astype(np.float32)
-y=y_test.astype('int')
-
-from sklearn.preprocessing import StandardScaler
-sc_X = StandardScaler()
-X = sc_X.fit_transform(X)
-#X = pd.DataFrame(preprocessing.StandardScaler().fit_transform(df), columns=df.columns, index=df.index)
-print(X)
-print(y)
-#print(pd.get_dummies(y))
-
-
 
 #Dividing the attack traffic 80% for training and 20% for testing
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
 print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 unique, counts = np.unique(y_test, return_counts=True)
 print("unique, counts =", unique, counts)
+
+# determine the number of input features
+n_features = X_train.shape[1]
+
 # define the keras model
-# first neural network with keras tutorial
-from numpy import loadtxt
+
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 model = Sequential()
-model.add(Dense(8, input_shape=(79,), activation='relu'))
+model.add(Dense(8, input_shape=(n_features,), activation='relu'))
 model.add(Dense(4, activation='relu'))
 model.add(Dense(1, activation='sigmoid'))
 # compile the keras model
@@ -126,12 +121,23 @@ model.summary()
 start_time = time.time()
 
 # fit the keras model on the dataset
-model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
+model.fit(X_train, y_train, epochs=10, batch_size=100)
 
 print("--- %s seconds ---" % (time.time() - start_time))
+
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print('Test Accuracy: %.3f' % acc)
+print('Test loss: %.3f' % loss)
+
+
 predictions = model.predict(X_test)
 #this step is necessary if you used to predict the labels of a 3 dimensional data
-predicted = np.argmax(predictions, axis = 1)
+predicted = np.rint(predictions)
+
+(unique, counts) = np.unique(predicted, return_counts=True)
+print("unique, counts =", unique, counts)
+
+
 # predicted = predictions
 print("predicted labels are ",predicted)
 print("actual labels are ",y_test)
@@ -152,7 +158,3 @@ print("f1_score is",f1Score)
 
 confusion_matrix = confusion_matrix(y_test,predicted)
 print('confusion_matrix is \n',confusion_matrix)
-
-loss, acc = model.evaluate(X_test, y_test, verbose=0)
-print('Test Accuracy: %.3f' % acc)
-print('Test loss: %.3f' % loss)
