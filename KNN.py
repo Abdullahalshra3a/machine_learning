@@ -138,12 +138,12 @@ f1Score = f1_score(y_test,predicted)
 print("f1_score is",f1Score)
 
 #loss, acc = clf.score(X_train, y_train)
-print('Test Accuracy: %.3f' % clf.score(X_train, y_train))
+#print("Accuracy:",accuracy_score(X_train, y_train))
 #print('Test loss: %.3f' % loss)
 
 
 false_positive_rate1, true_positive_rate1, threshold1 = roc_curve(y_test,predicted)
-print('roc_auc_score for RandomForest: ', roc_auc_score(y_test,predicted))
+print('roc_auc_score for KNN: ', roc_auc_score(y_test,predicted))
 print(false_positive_rate1, true_positive_rate1)
 confusion_matrix = confusion_matrix(y_test,predicted)
 print ("confusion_matrix",confusion_matrix)
@@ -164,7 +164,7 @@ fig, ax =plot_confusion_matrix(conf_mat=confusion_matrix, figsize=(8, 8), show_n
 plt.show()
 
 plt.subplots(1, figsize=(10,10))
-plt.title('Receiver Operating Characteristic - SVM')
+plt.title('Receiver Operating Characteristic - KNN')
 plt.plot(false_positive_rate1, true_positive_rate1)
 plt.plot([0, 1], ls="--")
 plt.plot([0, 0], [1, 0] , c=".7"), plt.plot([1, 1] , c=".7")
