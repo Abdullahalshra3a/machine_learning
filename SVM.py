@@ -1,37 +1,47 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
+import time
 import os, sys
 import pandas as pd
 import numpy as np
 #import cv2
 #from tqdm import tqdm
-from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 #import splitfolders
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.svm import SVC, LinearSVC
+from sklearn import svm
+#calculating metrics 
+from sklearn.metrics import classification_report, confusion_matrix,accuracy_score,recall_score,precision_score,f1_score, roc_curve, roc_auc_score
 
+import warnings
+warnings.filterwarnings('ignore') 
 #DataPath of your CICDDOS CSV files.
+import random
+DataPath = '/home/abdullah/Downloads/Dataset_Final'
 
-DataPath = '/home/abdullah/Downloads/CSV-03-11/03-11'
 #Get List of files in this directory by names.
 FilesList = os.listdir(DataPath)
 
-count = 0
-#DataPath of a folder to export images into it.
-dstpath = '/home/abdullah/Desktop/IM/Training'
-dstpath2 = dstpath + 'Benign_'
 
 cicids_data = []
 for FileName in FilesList:
   if FileName.endswith(".csv"):
     print(FileName)
-    cicids_data.append(pd.read_csv(DataPath +'/'+FileName, low_memory=Fals))
+    p = 0.01  # 1% of the lines
+    df = pd.read_csv(DataPath +'/'+FileName,  low_memory=False)#
+    df.drop(labels=['Unnamed: 0', 'Flow ID', ' Source IP', ' Source Port', ' Destination IP', ' Destination Port','SimillarHTTP', ' Timestamp'], axis=1, errors='ignore', inplace=True)
+   #Replacing the infinity values with NaN.
+    df = df.replace([np.inf, -np.inf], np.nan)
+    #Dropping NaN values.
+    df.dropna(inplace=True)#axis : {0 or ‘index’, 1 or ‘columns’}, default 0
+    cicids_data.append(df)
+
+ 
 #print(cicids_data)    
 cicids_data = pd.concat(cicids_data)
-cicids_data = cicids_data.rename(columns={'Label': 'Label'})
+cicids_data = cicids_data.rename(columns={' Label': 'label'})
 dataframe=cicids_data.copy()
 
 #print(dataframe)
@@ -39,24 +49,33 @@ print(dataframe.head(10))
 print('sucess')
 
 dataframe.to_csv('data.csv')
-#reading data from data.csv, usecols for reading only specified features
-df = pd.read_csv("data.csv", low_memory=False)
+
+df = dataframe
 df.drop(labels=['Unnamed: 0', 'Flow ID', ' Source IP', ' Source Port', ' Destination IP', ' Destination Port','SimillarHTTP', ' Timestamp'], axis=1, errors='ignore', inplace=True)
 #Replacing the infinity values with NaN.
-
 
 df = df.replace([np.inf, -np.inf], np.nan)
 #Dropping NaN values.
 df.dropna(inplace=True)#axis : {0 or ‘index’, 1 or ‘columns’}, default 0
 
 #df = df.rename(columns={' Label': 'Label'})
-df.loc[df['label'] != 'BENIGN', 'label'] = 1
-df.loc[df['label'] == 'BENIGN', 'label'] = 0
+df.loc[df['label'] != 'BENIGN', 'label'] = 0
+df.loc[df['label'] == 'BENIGN', 'label'] = 1
+
 
 print ("number of colummns %d" %(len(df.columns.values)))
 print ("number of rows %d" %(len(df.index.values)))
 #print availbe classes after filtering
-print(df['label'].count())
+print(df['label'].count()) 
+
+#extracting the features and labels from the dataframe
+
+X, y  = df.drop('label', axis=1), df.pop('label').values
+X = X.astype('float32')
+y = np.array(y).astype(int)
+
+
+
 #using shuffle for training data, it is recommended to avoid having the normal traffic or attack traffic in a sequence
 from sklearn.utils import shuffle
 df = shuffle(df)
@@ -67,30 +86,84 @@ df = shuffle(df)
 
 df = df.reset_index()
 del df['index']
+print(df.head(10))
 
-print(df.head())
-X = df.drop('label', axis=1)
-y = df['label']
-#X = pd.DataFrame(preprocessing.StandardScaler().fit_transform(df), columns=df.columns, index=df.index)
-#print(X)
-X = np.array(X).astype(np.float32)
-y=y.astype('int')
-#print(y)
+
 #Dividing the attack traffic 80% for training and 20% for testing
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.20)
 print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
-from sklearn.preprocessing import StandardScaler
-sc_X = StandardScaler()
-X_train = sc_X.fit_transform(X_train)
-X_test = sc_X.transform(X_test)
-svclassifier = SVC(C=0.001, kernel='linear')
-import time
-start = time.time()
-svclassifier.fit(X_train, y_train)
-stop = time.time()
-print("The time of the run:", stop - start)
+unique, counts = np.unique(y_test, return_counts=True)
+print("unique, counts =", unique, counts)
 
-y_pred = svclassifier.predict(X_test)
-print(confusion_matrix(y_test,y_pred))
-print(classification_report(y_test,y_pred))
-print ("Accuracy : ", accuracy_score(y_test, y_pred))
+
+
+
+#Create a svm Classifier
+clf = LinearSVC(verbose=1)
+start_time = time.time()
+clf.fit(X_train, y_train)
+print("--- %s seconds ---" % (time.time() - start_time))
+
+
+predictions = clf.predict(X_test)
+#this step is necessary if you used to predict the labels of a 3 dimensional data
+predicted = np.rint(predictions)
+
+(unique, counts) = np.unique(predicted, return_counts=True)
+print("unique, counts =", unique, counts)
+
+
+# predicted = predictions
+print("predicted labels are ",predicted)
+print("actual labels are ",y_test)
+print(predicted.dtype)
+print(predicted.shape)
+
+print(confusion_matrix(y_test,predicted))
+print(classification_report(y_test,predicted))
+print ("Accuracy : ", accuracy_score(y_test, predicted))
+
+accuracy = accuracy_score(y_test,predicted)
+print('accuracy_score is',accuracy)
+precision = precision_score(y_test,predicted)
+print("precision is ", precision )
+recall = recall_score(y_test,predicted)
+print("recall is", recall )
+f1Score = f1_score(y_test,predicted)
+print("f1_score is",f1Score)
+
+#loss, acc = clf.score(X_train, y_train)
+print('Test Accuracy: %.3f' % clf.score(X_train, y_train))
+#print('Test loss: %.3f' % loss)
+
+
+false_positive_rate1, true_positive_rate1, threshold1 = roc_curve(y_test,predicted)
+print('roc_auc_score for SVM: ', roc_auc_score(y_test,predicted))
+print(false_positive_rate1, true_positive_rate1)
+confusion_matrix = confusion_matrix(y_test,predicted)
+print ("confusion_matrix",confusion_matrix)
+from mlxtend.plotting import plot_confusion_matrix
+import matplotlib.pyplot as plt
+import matplotlib
+
+font = {
+'family': 'Times New Roman',
+'size': 12
+}
+matplotlib.rc('font', **font)
+
+fig, ax =plot_confusion_matrix(conf_mat=confusion_matrix, figsize=(8, 8), show_normed=True)
+#PCM=ax.get_children()
+#plt.colorbar(PCM)
+#plt.tight_layout()
+plt.show()
+
+plt.subplots(1, figsize=(10,10))
+plt.title('Receiver Operating Characteristic - SVM')
+plt.plot(false_positive_rate1, true_positive_rate1)
+plt.plot([0, 1], ls="--")
+plt.plot([0, 0], [1, 0] , c=".7"), plt.plot([1, 1] , c=".7")
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.show()
+
