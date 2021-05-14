@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 #import splitfolders
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 #calculating metrics 
 from sklearn.metrics import classification_report, confusion_matrix,accuracy_score,recall_score,precision_score,f1_score, roc_curve, roc_auc_score
 
@@ -92,12 +92,10 @@ print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 unique, counts = np.unique(y_test, return_counts=True)
 print("unique, counts =", unique, counts)
 
-sc = StandardScaler()
-X_train = sc.fit_transform(X_train)
-X_test = sc.transform(X_test)
+
 
 #Create a RandomForest Classifier
-clf = RandomForestRegressor(n_estimators=20, random_state=0)
+clf = RandomForestClassifier()
 start_time = time.time()
 clf.fit(X_train, y_train)
 print("--- %s seconds ---" % (time.time() - start_time))
@@ -157,7 +155,7 @@ fig, ax =plot_confusion_matrix(conf_mat=confusion_matrix, figsize=(8, 8), show_n
 plt.show()
 
 plt.subplots(1, figsize=(10,10))
-plt.title('Receiver Operating Characteristic - RandomForest')
+plt.title('Receiver Operating Characteristic - SVM')
 plt.plot(false_positive_rate1, true_positive_rate1)
 plt.plot([0, 1], ls="--")
 plt.plot([0, 0], [1, 0] , c=".7"), plt.plot([1, 1] , c=".7")
